@@ -37,6 +37,7 @@
   </div>
 
   <script>
+    let breathingPhase = 0;
     const leftEye = document.getElementById('left-eye');
     const rightEye = document.getElementById('right-eye');
     const face = document.getElementById('face');
@@ -102,19 +103,26 @@
 
     function sleep() {
       isSleeping = true;
+      breathingPhase = 0; // ★ 呼吸リセット
       sleepAngle = 0;
+    
       face.innerHTML =
         '<span id="left-eye">-</span>' +
         '<span id="mouth">_</span>' +
         '<span id="right-eye">-</span>';
+    
+      mouth = document.getElementById('mouth');
     }
     
     function wakeUp() {
       isSleeping = false;
+    
       face.innerHTML =
         '<span id="left-eye">˙</span>' +
         '<span id="mouth">-</span>' +
         '<span id="right-eye">˙</span>';
+    
+      mouth = document.getElementById('mouth');
     }
     
     // ===== マイク入力で口を動かす =====
@@ -144,35 +152,38 @@
         console.error('マイク取得失敗', e);
       }
     }
-    
+        
     function updateMouth() {
-      analyser.getByteTimeDomainData(dataArray);
-    
-      // RMS 音量
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const v = (dataArray[i] - 128) / 128;
-        sum += v * v;
-      }
-      const rms = Math.sqrt(sum / dataArray.length);
-    
-      // 平滑化
-      smoothedVolume =
-        smoothing * smoothedVolume + (1 - smoothing) * rms;
-    
       if (isSleeping) {
-        mouth.style.transform = 'scaleY(0.5)';
+        // ===== 寝息（呼吸）=====
+        breathingPhase += 0.02; // 呼吸速度（小さくするとゆっくり）
+        const breath = Math.sin(breathingPhase) * 0.15;
+    
+        const baseScale = 0.6;
+        mouth.textContent = '_';
+        mouth.style.transform = `scaleY(${baseScale + breath})`;
+    
       } else {
-        // 音量 → 口の開き
+        // ===== 起きている時（音声連動）=====
+        analyser.getByteTimeDomainData(dataArray);
+    
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const v = (dataArray[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+    
+        smoothedVolume =
+          smoothing * smoothedVolume + (1 - smoothing) * rms;
+    
         const minScale = 0.5;
-        const maxScale = 2.0;
+        const maxScale = 1.8;
     
-        let scale =
-          minScale + smoothedVolume * 15;
-    
-        // クランプ（ガタ防止）
+        let scale = minScale + smoothedVolume * 15;
         scale = Math.min(maxScale, Math.max(minScale, scale));
     
+        mouth.textContent = '-';
         mouth.style.transform = `scaleY(${scale})`;
       }
     
