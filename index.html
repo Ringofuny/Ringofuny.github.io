@@ -21,6 +21,12 @@
       white-space: nowrap;
       line-height: 0.8;
     }
+    
+    #mouth {
+      display: inline-block;
+      transform-origin: center center;
+      transition: transform 0.05s linear; /* 微振動防止 */
+    }
   </style>
 </head>
 <body>
@@ -29,7 +35,7 @@
     <span id="mouth">-</span>
     <span id="right-eye">˙</span>
   </div>
-  
+
   <script>
     const leftEye = document.getElementById('left-eye');
     const rightEye = document.getElementById('right-eye');
@@ -142,7 +148,7 @@
     function updateMouth() {
       analyser.getByteTimeDomainData(dataArray);
     
-      // RMS 音量計算
+      // RMS 音量
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) {
         const v = (dataArray[i] - 128) / 128;
@@ -150,19 +156,24 @@
       }
       const rms = Math.sqrt(sum / dataArray.length);
     
-      // 平滑化（指数移動平均）
+      // 平滑化
       smoothedVolume =
         smoothing * smoothedVolume + (1 - smoothing) * rms;
     
-      // 口の形を段階化
       if (isSleeping) {
-        mouth.textContent = '_';
-      } else if (smoothedVolume < 0.02) {
-        mouth.textContent = '-';
-      } else if (smoothedVolume < 0.05) {
-        mouth.textContent = '_';
+        mouth.style.transform = 'scaleY(0.5)';
       } else {
-        mouth.textContent = '╻';
+        // 音量 → 口の開き
+        const minScale = 0.5;
+        const maxScale = 2.0;
+    
+        let scale =
+          minScale + smoothedVolume * 15;
+    
+        // クランプ（ガタ防止）
+        scale = Math.min(maxScale, Math.max(minScale, scale));
+    
+        mouth.style.transform = `scaleY(${scale})`;
       }
     
       requestAnimationFrame(updateMouth);
