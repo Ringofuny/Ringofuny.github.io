@@ -24,8 +24,12 @@
   </style>
 </head>
 <body>
-  <div id="face"><span id="left-eye">˙</span> - <span id="right-eye">˙</span></div>
-
+  <div id="face">
+    <span id="left-eye">˙</span>
+    <span id="mouth">-</span>
+    <span id="right-eye">˙</span>
+  </div>
+  
   <script>
     const leftEye = document.getElementById('left-eye');
     const rightEye = document.getElementById('right-eye');
@@ -93,15 +97,79 @@
     function sleep() {
       isSleeping = true;
       sleepAngle = 0;
-      leftEye.textContent = '¯';
-      rightEye.textContent = '¯';
-      face.innerHTML = '<span id="left-eye">-</span> _ <span id="right-eye">-</span>'; // 寝顔
+      face.innerHTML =
+        '<span id="left-eye">-</span>' +
+        '<span id="mouth">_</span>' +
+        '<span id="right-eye">-</span>';
     }
-
+    
     function wakeUp() {
       isSleeping = false;
-      face.innerHTML = '<span id="left-eye">˙</span> - <span id="right-eye">˙</span>';
+      face.innerHTML =
+        '<span id="left-eye">˙</span>' +
+        '<span id="mouth">-</span>' +
+        '<span id="right-eye">˙</span>';
     }
+    
+    // ===== マイク入力で口を動かす =====
+    const mouth = document.getElementById('mouth');
+    
+    let audioCtx;
+    let analyser;
+    let dataArray;
+    
+    let smoothedVolume = 0;   // 平滑化後音量
+    const smoothing = 0.85;   // 0.8～0.9 推奨（大きいほど滑らか）
+    
+    async function initMic() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(stream);
+    
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+    
+        dataArray = new Uint8Array(analyser.fftSize);
+    
+        source.connect(analyser);
+        updateMouth();
+      } catch (e) {
+        console.error('マイク取得失敗', e);
+      }
+    }
+    
+    function updateMouth() {
+      analyser.getByteTimeDomainData(dataArray);
+    
+      // RMS 音量計算
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const v = (dataArray[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / dataArray.length);
+    
+      // 平滑化（指数移動平均）
+      smoothedVolume =
+        smoothing * smoothedVolume + (1 - smoothing) * rms;
+    
+      // 口の形を段階化
+      if (isSleeping) {
+        mouth.textContent = '_';
+      } else if (smoothedVolume < 0.02) {
+        mouth.textContent = '-';
+      } else if (smoothedVolume < 0.05) {
+        mouth.textContent = '_';
+      } else {
+        mouth.textContent = '╻';
+      }
+    
+      requestAnimationFrame(updateMouth);
+    }
+    
+    // ユーザー操作で開始（自動再生制限対策）
+    document.addEventListener('click', initMic, { once: true });
   </script>
 </body>
 </html>
