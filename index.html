@@ -24,7 +24,7 @@
   </style>
 </head>
 <body>
-  <div id="face"><span id="left-eye">•</span> - <span id="right-eye">•</span></div>
+  <div id="face"><span id="left-eye">˙</span> - <span id="right-eye">˙</span></div>
 
   <script>
     const leftEye = document.getElementById('left-eye');
@@ -54,13 +54,13 @@
     function blink() {
       if (isSleeping) return;
 
-      leftEye.textContent = '-';  // 左目閉じる
-      rightEye.textContent = '-'; // 右目閉じる
+      leftEye.textContent = '¯';  // 左目閉じる
+      rightEye.textContent = '¯'; // 右目閉じる
       face.style.transform = 'translate(-50%, calc(-50% + 5px)) scale(0.95)';
 
       setTimeout(() => {
-        leftEye.textContent = '•'; // 左目開く
-        rightEye.textContent = '•'; // 右目開く
+        leftEye.textContent = '˙'; // 左目開く
+        rightEye.textContent = '˙'; // 右目開く
         face.style.transform = 'translate(-50%, -50%)';
       }, 150);
 
@@ -93,14 +93,14 @@
     function sleep() {
       isSleeping = true;
       sleepAngle = 0;
-      leftEye.textContent = '-';
-      rightEye.textContent = '-';
+      leftEye.textContent = '¯';
+      rightEye.textContent = '¯';
       face.innerHTML = '<span id="left-eye">-</span> _ <span id="right-eye">-</span>'; // 寝顔
     }
 
     function wakeUp() {
       isSleeping = false;
-      face.innerHTML = '<span id="left-eye">•</span> - <span id="right-eye">•</span>';
+      face.innerHTML = '<span id="left-eye">˙</span> - <span id="right-eye">˙</span>';
     }
   </script>
 </body>
