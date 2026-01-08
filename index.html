@@ -1,186 +1,151 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>ふわふわ ˙-˙ + gaze</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: #000;
-    }
+<meta charset="UTF-8">
+<title>ふわふわ ˙-˙ gaze</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #000;
+  }
 
-    #face {
-      font-size: 256px;
-      color: #fff;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      white-space: nowrap;
-      line-height: 0.8;
-    }
+  #face {
+    font-size: 256px;
+    color: #fff;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+    line-height: 0.8;
+  }
 
-    .eye {
-      display: inline-block;
-      width: 1em;              /* ずらすための箱 */
-      text-align: center;
-      transition: transform 0.1s ease-out;
-    }
+  .eye {
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+    transform-origin: center center;
+    transition: transform 0.1s ease-out;
+  }
 
-    #mouth {
-      display: inline-block;
-      transform-origin: center center;
-      transition: transform 0.05s linear;
-    }
+  #mouth {
+    display: inline-block;
+    transform-origin: center center;
+    transition: transform 0.05s linear;
+  }
 
-    video {
-      display: none;
-    }
-  </style>
+  video { display: none; }
+</style>
 </head>
 <body>
 
-  <div id="face">
-    <span id="left-eye"  class="eye">˙</span>
-    <span id="mouth">-</span>
-    <span id="right-eye" class="eye">˙</span>
-  </div>
+<div id="face">
+  <span id="left-eye" class="eye">˙</span>
+  <span id="mouth">-</span>
+  <span id="right-eye" class="eye">˙</span>
+</div>
 
-  <video id="video" autoplay playsinline></video>
+<video id="video" autoplay playsinline></video>
 
-  <script>
-    const face = document.getElementById('face');
-    const leftEye  = document.getElementById('left-eye');
-    const rightEye = document.getElementById('right-eye');
-    const mouth = document.getElementById('mouth');
-    const video = document.getElementById('video');
+<script>
+const face = document.getElementById('face');
+const leftEye = document.getElementById('left-eye');
+const rightEye = document.getElementById('right-eye');
+const mouth = document.getElementById('mouth');
+const video = document.getElementById('video');
 
-    /* =====================
-       ふわふわ浮遊
-    ===================== */
-    let angle = 0;
-    function floatFace() {
-      angle += 0.05;
-      const y = Math.cos(angle) * 10;
-      face.style.transform =
-        `translate(-50%, calc(-50% + ${y}px))`;
-      requestAnimationFrame(floatFace);
-    }
-    floatFace();
+/* ===== 浮遊 ===== */
+let angle = 0;
+function floatFace() {
+  angle += 0.05;
+  face.style.transform =
+    `translate(-50%, calc(-50% + ${Math.cos(angle) * 10}px))`;
+  requestAnimationFrame(floatFace);
+}
+floatFace();
 
-    /* =====================
-       瞬き（位置ずらしは維持）
-    ===================== */
-    function blink() {
-      leftEye.textContent = '¯';
-      rightEye.textContent = '¯';
+/* ===== 瞬き ===== */
+function blink() {
+  leftEye.textContent = rightEye.textContent = '¯';
+  setTimeout(() => {
+    leftEye.textContent = rightEye.textContent = '˙';
+  }, 150);
+  setTimeout(blink, Math.random() * 4000 + 2000);
+}
+setTimeout(blink, 3000);
 
-      setTimeout(() => {
-        leftEye.textContent = '˙';
-        rightEye.textContent = '˙';
-      }, 150);
+/* ===== マイク ===== */
+let audioCtx, analyser, dataArray;
+let smoothedVolume = 0;
 
-      setTimeout(blink, Math.random() * 4000 + 2000);
-    }
-    setTimeout(blink, 3000);
+async function initMic() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const src = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  dataArray = new Uint8Array(analyser.fftSize);
+  src.connect(analyser);
+  updateMouth();
+}
 
-    /* =====================
-       マイク → 口
-    ===================== */
-    let audioCtx, analyser, dataArray;
-    let smoothedVolume = 0;
-    const smoothing = 0.88;
+function updateMouth() {
+  analyser.getByteTimeDomainData(dataArray);
+  let sum = 0;
+  for (let i = 0; i < dataArray.length; i++) {
+    const v = (dataArray[i] - 128) / 128;
+    sum += v * v;
+  }
+  smoothedVolume = 0.88 * smoothedVolume + 0.12 * Math.sqrt(sum / dataArray.length);
+  const scale = Math.min(1.8, Math.max(0.5, 0.5 + smoothedVolume * 15));
+  mouth.style.transform = `scaleY(${scale})`;
+  requestAnimationFrame(updateMouth);
+}
 
-    async function initMic() {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+/* ===== 視線（共通関数）===== */
+function setEyeOffset(px) {
+  leftEye.style.transform = `translateX(${px}px)`;
+  rightEye.style.transform = `translateX(${px}px)`;
+}
 
-      audioCtx =
-        new (window.AudioContext || window.webkitAudioContext)();
+/* ===== マウスフォールバック ===== */
+document.addEventListener('mousemove', e => {
+  const norm = (e.clientX / window.innerWidth - 0.5) * 2;
+  setEyeOffset(norm * 12);
+});
 
-      const source =
-        audioCtx.createMediaStreamSource(stream);
+/* ===== カメラ（使えれば）===== */
+async function initCamera() {
+  if (!('FaceDetector' in window)) {
+    console.warn('FaceDetector 未対応 → マウス制御');
+    return;
+  }
 
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;
-      dataArray = new Uint8Array(analyser.fftSize);
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+  const detector = new FaceDetector({ fastMode: true });
 
-      source.connect(analyser);
-      updateMouth();
-    }
-
-    function updateMouth() {
-      analyser.getByteTimeDomainData(dataArray);
-
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const v = (dataArray[i] - 128) / 128;
-        sum += v * v;
+  async function detect() {
+    if (video.readyState === 4) {
+      const faces = await detector.detect(video);
+      if (faces.length) {
+        const box = faces[0].boundingBox;
+        const centerX = box.x + box.width / 2;
+        const norm = (centerX / video.videoWidth - 0.5) * 2;
+        setEyeOffset(norm * 12);
       }
-      const rms = Math.sqrt(sum / dataArray.length);
-
-      smoothedVolume =
-        smoothing * smoothedVolume + (1 - smoothing) * rms;
-
-      let scale = 0.5 + smoothedVolume * 15;
-      scale = Math.min(1.8, Math.max(0.5, scale));
-
-      mouth.style.transform = `scaleY(${scale})`;
-      requestAnimationFrame(updateMouth);
     }
+    requestAnimationFrame(detect);
+  }
+  detect();
+}
 
-    /* =====================
-       カメラ → 視線位置ずらし
-    ===================== */
-    let detector;
-    let eyeOffset = 0;
-
-    async function initCamera() {
-      const stream =
-        await navigator.mediaDevices.getUserMedia({ video: true });
-
-      video.srcObject = stream;
-      detector = new FaceDetector({ fastMode: true });
-      detectFace();
-    }
-
-    async function detectFace() {
-      if (video.readyState === 4) {
-        const faces = await detector.detect(video);
-
-        if (faces.length > 0) {
-          const box = faces[0].boundingBox;
-          const centerX = box.x + box.width / 2;
-          const screenCenter = video.videoWidth / 2;
-
-          // -1.0 ～ +1.0 に正規化
-          let norm =
-            (centerX - screenCenter) / screenCenter;
-
-          norm = Math.max(-1, Math.min(1, norm));
-
-          eyeOffset = norm * 12; // 最大ずらし量(px)
-        } else {
-          eyeOffset *= 0.9; // 見失ったら自然に戻る
-        }
-
-        leftEye.style.transform =
-          `translateX(${eyeOffset}px)`;
-        rightEye.style.transform =
-          `translateX(${eyeOffset}px)`;
-      }
-      requestAnimationFrame(detectFace);
-    }
-
-    /* =====================
-       起動（Safari対策）
-    ===================== */
-    document.addEventListener('click', async () => {
-      await initMic();
-      await initCamera();
-    }, { once: true });
-  </script>
-
+/* ===== 起動 ===== */
+document.addEventListener('click', async () => {
+  await initMic();
+  await initCamera();
+}, { once: true });
+</script>
 </body>
 </html>
